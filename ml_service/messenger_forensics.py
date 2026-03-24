@@ -162,28 +162,27 @@ def create_demo_db(path="demo_messenger.db"):
 # ─────────────────────────────────────────────
 # 3. EXTRACTION FUNCTIONS
 # ─────────────────────────────────────────────
+import pandas as pd
+
 def extract_messages(conn, keywords=None):
-    """Extract messages, optionally flagging by keyword."""
     query = """
-        SELECT
-            m.msg_id,
-            datetime(m.timestamp_ms / 1000, 'unixepoch') AS datetime_utc,
-            m.timestamp_ms,
-            c.name  AS sender,
-            m.thread_key,
-            m.text,
-            m.is_deleted
-        FROM messages m
-        LEFT JOIN contacts c ON m.sender = c.contact_id
-        WHERE m.text IS NOT NULL
-        ORDER BY m.timestamp_ms ASC
+    SELECT 
+        id,
+        sender,
+        text,
+        datetime_utc
+    FROM messages
     """
+
     df = pd.read_sql_query(query, conn)
+
+    # Optional keyword flagging (keep this)
     if keywords:
         pattern = "|".join(keywords)
         df["flagged"] = df["text"].str.contains(pattern, case=False, na=False)
     else:
         df["flagged"] = False
+
     return df
 
 
