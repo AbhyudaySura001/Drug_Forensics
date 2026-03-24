@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DF-2024-0847 | Drug Forensic Intelligence Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root {
+    --bg:       #080c10;
+    --bg2:      #0d1117;
+    --bg3:      #131920;
+    --border:   #1e2d3d;
+    --border2:  #2a3f52;
+    --green:    #00d68f;
+    --green2:   #00a36c;
+    --red:      #ff4444;
+    --amber:    #f0a500;
+    --blue:     #4da6ff;
+    --purple:   #a78bfa;
+    --text:     #c9d1d9;
+    --text2:    #8b949e;
+    --text3:    #3d4f60;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Rajdhani', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SCAN LINE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,214,143,0.015) 2px, rgba(0,214,143,0.015) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg2);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px; color: var(--green);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-bracket { color: var(--text3); }
+  .case-id {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text2); letter-spacing: .08em;
+  }
+  .status-pill {
+    background: rgba(255,68,68,.12);
+    border: 1px solid rgba(255,68,68,.3);
+    color: var(--red);
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 10px; border-radius: 2px;
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+  /* LAYOUT */
+  .wrapper { display: flex; min-height: calc(100vh - 53px); }
+
+  /* SIDEBAR */
+  nav {
+    width: 200px; flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 20px 0;
+  }
+  nav .section-label {
+    font-family: var(--mono); font-size: 9px;
+    color: var(--text3); letter-spacing: .15em;
+    padding: 0 18px 8px; text-transform: uppercase;
+  }
+  nav button {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 10px 18px;
+    background: transparent; border: none;
+    color: var(--text2); font-family: var(--sans);
+    font-size: 14px; font-weight: 500;
+    cursor: pointer; text-align: left;
+    border-left: 2px solid transparent;
+    transition: all .15s;
+  }
+  nav button:hover { color: var(--text); background: rgba(255,255,255,.03); }
+  nav button.active {
+    color: var(--green); border-left-color: var(--green);
+    background: rgba(0,214,143,.06);
+  }
+  nav button .icon { font-size: 14px; width: 18px; text-align: center; }
+  nav .divider { border: none; border-top: 1px solid var(--border); margin: 10px 18px; }
+
+  /* MAIN */
+  main { flex: 1; padding: 24px 28px; overflow-x: hidden; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* PAGE HEADER */
+  .page-title {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--green); letter-spacing: .12em;
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .page-subtitle {
+    font-size: 22px; font-weight: 700;
+    color: var(--text); margin-bottom: 22px;
+    font-family: var(--sans);
+  }
+
+  /* METRIC CARDS */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+  .metric {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px; padding: 16px;
+    position: relative; overflow: hidden;
+  }
+  .metric::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+  }
+  .metric.g::before { background: var(--green); }
+  .metric.r::before { background: var(--red); }
+  .metric.a::before { background: var(--amber); }
+  .metric.b::before { background: var(--blue); }
+  .metric .m-label { font-family: var(--mono); font-size: 10px; color: var(--text2); letter-spacing: .08em; margin-bottom: 8px; }
+  .metric .m-value { font-size: 30px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .metric.g .m-value { color: var(--green); }
+  .metric.r .m-value { color: var(--red); }
+  .metric.a .m-value { color: var(--amber); }
+  .metric.b .m-value { color: var(--blue); }
+  .metric .m-sub { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+  /* GRID */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* CARD */
+  .card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px; padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card-head {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--green); letter-spacing: .1em;
+    text-transform: uppercase; margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text3); text-align: left;
+    padding: 0 10px 8px; letter-spacing: .08em;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+
+  /* BADGE */
+  .badge {
+    font-family: var(--mono); font-size: 9px;
+    padding: 2px 7px; border-radius: 2px;
+    letter-spacing: .05em; font-weight: normal;
+  }
+  .badge-red    { background: rgba(255,68,68,.15);   color: #ff6b6b; border: 1px solid rgba(255,68,68,.3); }
+  .badge-amber  { background: rgba(240,165,0,.15);   color: #f0a500; border: 1px solid rgba(240,165,0,.3); }
+  .badge-green  { background: rgba(0,214,143,.12);   color: var(--green); border: 1px solid rgba(0,214,143,.3); }
+  .badge-blue   { background: rgba(77,166,255,.12);  color: var(--blue);  border: 1px solid rgba(77,166,255,.3); }
+  .badge-purple { background: rgba(167,139,250,.12); color: var(--purple);border: 1px solid rgba(167,139,250,.3); }
+
+  /* NETWORK GRAPH */
+  #graph-container {
+    width: 100%; height: 480px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative; overflow: hidden;
+  }
+  #graph-container svg { width: 100%; height: 100%; }
+  .node-label { font-family: var(--mono); font-size: 10px; pointer-events: none; }
+  .link { stroke-opacity: 0.5; fill: none; }
+  .node circle { stroke-width: 1.5; cursor: pointer; transition: all .2s; }
+  .node circle:hover { stroke-width: 3; filter: brightness(1.3); }
+  .node-tooltip {
+    position: absolute; background: var(--bg2);
+    border: 1px solid var(--border2);
+    padding: 10px 14px; border-radius: 4px;
+    font-family: var(--mono); font-size: 11px;
+    pointer-events: none; opacity: 0;
+    transition: opacity .15s; z-index: 10;
+    min-width: 160px;
+  }
+  .node-tooltip .tt-name { color: var(--green); font-size: 12px; margin-bottom: 4px; }
+  .node-tooltip .tt-row  { color: var(--text2); margin-top: 2px; }
+  .node-tooltip .tt-row span { color: var(--text); }
+  .graph-legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--text2); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* MESSAGES */
+  .msg-filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .filter-btn {
+    font-family: var(--mono); font-size: 10px;
+    padding: 5px 12px; border: 1px solid var(--border2);
+    background: transparent; color: var(--text2);
+    border-radius: 2px; cursor: pointer; letter-spacing: .05em;
+    transition: all .15s;
+  }
+  .filter-btn:hover { border-color: var(--green); color: var(--green); }
+  .filter-btn.on { background: rgba(0,214,143,.1); border-color: var(--green); color: var(--green); }
+  .msg-item {
+    padding: 12px; border: 1px solid var(--border);
+    border-radius: 4px; margin-bottom: 8px;
+    background: var(--bg); transition: border-color .15s;
+  }
+  .msg-item:hover { border-color: var(--border2); }
+  .msg-item.flagged { border-left: 3px solid var(--red); }
+  .msg-item.deleted { border-left: 3px solid var(--purple); opacity: .85; }
+  .msg-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .msg-sender { font-family: var(--mono); font-size: 11px; color: var(--green); }
+  .msg-time   { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+  .msg-thread { font-family: var(--mono); font-size: 10px; color: var(--blue); }
+  .msg-text   { font-size: 14px; color: var(--text); line-height: 1.5; }
+  .msg-text .highlight { background: rgba(255,68,68,.2); color: var(--red); border-radius: 2px; padding: 0 2px; }
+
+  /* CALL LOG */
+  .call-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .call-item:last-child { border-bottom: none; }
+  .call-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .call-icon.audio { background: rgba(0,214,143,.12); }
+  .call-icon.video { background: rgba(77,166,255,.12); }
+
+  /* REPORT */
+  .report-box {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 20px;
+    font-family: var(--mono); font-size: 12px;
+    line-height: 1.8; color: var(--text);
+    white-space: pre-wrap; max-height: 520px;
+    overflow-y: auto;
+  }
+  .report-box .r-head   { color: var(--green); }
+  .report-box .r-label  { color: var(--amber); }
+  .report-box .r-value  { color: var(--text); }
+  .report-box .r-flag   { color: var(--red); }
+  .report-box .r-del    { color: var(--purple); }
+  .report-box .r-div    { color: var(--border2); }
+
+  /* NIST PHASES */
+  .phase {
+    display: flex; gap: 16px; padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .phase:last-child { border-bottom: none; }
+  .phase-num {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .phase-content { flex: 1; }
+  .phase-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .phase-desc  { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+  /* TIMELINE */
+  .tl-item { display: flex; gap: 14px; padding: 10px 0; position: relative; }
+  .tl-left { display: flex; flex-direction: column; align-items: center; width: 40px; flex-shrink: 0; }
+  .tl-dot  { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .tl-line { width: 1px; flex: 1; background: var(--border); margin-top: 4px; min-height: 20px; }
+  .tl-date { font-family: var(--mono); font-size: 10px; color: var(--text3); min-width: 50px; padding-top: 2px; }
+  .tl-body { flex: 1; padding-bottom: 10px; }
+  .tl-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .tl-sub   { font-size: 12px; color: var(--text2); }
+
+  /* PROGRESS BAR */
+  .prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .prog-label { font-size: 13px; min-width: 140px; }
+  .prog-bar { flex: 1; height: 5px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 2px; background: var(--green); }
+  .prog-val { font-family: var(--mono); font-size: 11px; color: var(--text2); min-width: 36px; text-align: right; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+  /* ANIMATE IN */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+  .page.active .card, .page.active .metrics, .page.active #graph-container {
+    animation: fadeUp .3s ease both;
+  }
+
+  /* SEARCH */
+  .search-bar {
+    width: 100%; padding: 9px 14px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text);
+    font-family: var(--mono); font-size: 12px;
+    outline: none; margin-bottom: 14px;
+    transition: border-color .15s;
+  }
+  .search-bar:focus { border-color: var(--green); }
+  .search-bar::placeholder { color: var(--text3); }
+
+  /* EXPORT BTN */
+  .btn {
+    font-family: var(--mono); font-size: 11px;
+    padding: 7px 16px; border-radius: 2px; cursor: pointer;
+    letter-spacing: .06em; transition: all .15s;
+  }
+  .btn-green {
+    background: rgba(0,214,143,.1); border: 1px solid var(--green);
+    color: var(--green);
+  }
+  .btn-green:hover { background: rgba(0,214,143,.2); }
+  .btn-red {
+    background: rgba(255,68,68,.1); border: 1px solid var(--red);
+    color: var(--red);
+  }
+  .empty { font-family: var(--mono); font-size: 12px; color: var(--text3); text-align: center; padding: 30px; }
+
+  /* HASH BOX */
+  .hash-box {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 12px 16px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--green); word-break: break-all;
+    margin-bottom: 12px;
+  }
+  .hash-label { color: var(--text3); font-size: 10px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-bracket">[</span>
+    DFINT
+    <span class="logo-bracket">]</span>
+    Drug Forensic Intelligence Terminal
+  </div>
+  <div class="case-id">CASE // DF-2024-0847 &nbsp;|&nbsp; NIST SP 800-101 R1</div>
+  <div class="status-pill">● ACTIVE INVESTIGATION</div>
+</header>
+
+<div class="wrapper">
+
+  <!-- SIDEBAR -->
+  <nav>
+    <div class="section-label">Navigation</div>
+    <button class="active" onclick="showPage('overview')" data-page="overview"><span class="icon">◈</span> Overview</button>
+    <button onclick="showPage('network')"   data-page="network"><span class="icon">⬡</span> Network Map</button>
+    <button onclick="showPage('messages')"  data-page="messages"><span class="icon">▤</span> Messages</button>
+    <button onclick="showPage('calls')"     data-page="calls"><span class="icon">◎</span> Call Log</button>
+    <hr class="divider"/>
+    <div class="section-label">Analysis</div>
+    <button onclick="showPage('nist')"      data-page="nist"><span class="icon">▣</span> NIST Framework</button>
+    <button onclick="showPage('timeline')"  data-page="timeline"><span class="icon">◷</span> Timeline</button>
+    <button onclick="showPage('report')"    data-page="report"><span class="icon">≡</span> Report</button>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main>
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="page-overview">
+      <div class="page-title">// system status</div>
+      <div class="page-subtitle">Investigation Overview</div>
+      <div class="metrics">
+        <div class="metric r"><div class="m-label">SUSPECTS</div><div class="m-value">7</div><div class="m-sub">3 high-priority</div></div>
+        <div class="metric b"><div class="m-label">DEVICES SEIZED</div><div class="m-value">12</div><div class="m-sub">9 Android, 3 other</div></div>
+        <div class="metric a"><div class="m-label">ARTIFACTS</div><div class="m-value">4,823</div><div class="m-sub">extracted &amp; analyzed</div></div>
+        <div class="metric g"><div class="m-label">NETWORK NODES</div><div class="m-value">23</div><div class="m-sub">6 clusters identified</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head">Evidence Summary</div>
+          <table>
+            <tr><th>Type</th><th>Count</th><th>Status</th></tr>
+            <tr><td>Chat Messages</td><td>2,341</td><td><span class="badge badge-green">Extracted</span></td></tr>
+            <tr><td>Call Records</td><td>887</td><td><span class="badge badge-green">Extracted</span></td></tr>
+            <tr><td>GPS Locations</td><td>312</td><td><span class="badge badge-green">Verified</span></td></tr>
+            <tr><td>Crypto Transactions</td><td>45</td><td><span class="badge badge-amber">Tracing</span></td></tr>
+            <tr><td>Media Files</td><td>1,238</td><td><span class="badge badge-blue">Analyzing</span></td></tr>
+            <tr><td>Deleted Records</td><td>156</td><td><span class="badge badge-purple">Recovered</span></td></tr>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-head">Drug Identification Confidence</div>
+          <div class="prog-row"><div class="prog-label">Methamphetamine</div><div class="prog-bar"><div class="prog-fill" style="width:92%"></div></div><div class="prog-val">92%</div></div>
+          <div class="prog-row"><div class="prog-label">MDMA</div><div class="prog-bar"><div class="prog-fill" style="width:87%"></div></div><div class="prog-val">87%</div></div>
+          <div class="prog-row"><div class="prog-label">Heroin</div><div class="prog-bar"><div class="prog-fill" style="width:74%; background:var(--amber)"></div></div><div class="prog-val">74%</div></div>
+          <div class="prog-row"><div class="prog-label">Cocaine</div><div class="prog-bar"><div class="prog-fill" style="width:65%; background:var(--amber)"></div></div><div class="prog-val">65%</div></div>
+          <div class="prog-row"><div class="prog-label">Cannabis</div><div class="prog-bar"><div class="prog-fill" style="width:99%"></div></div><div class="prog-val">99%</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">Forensic Tools Used</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <span class="badge badge-blue">Cellebrite UFED</span>
+          <span class="badge badge-blue">Magnet AXIOM</span>
+          <span class="badge badge-green">Autopsy 4.21</span>
+          <span class="badge badge-green">ADB Shell</span>
+          <span class="badge badge-purple">DB Browser SQLite</span>
+          <span class="badge badge-purple">Oxygen Forensic</span>
+          <span class="badge badge-amber">Chainalysis</span>
+          <span class="badge badge-amber">Maltego CE</span>
+          <span class="badge badge-red">i2 Analyst Notebook</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">Centrality Analysis (from criminal_network.py output)</div>
+        <table>
+          <tr><th>Node ID</th><th>Name</th><th>Role</th><th>Sent</th><th>Received</th><th>Betweenness</th></tr>
+          <tr><td style="font-family:var(--mono)">K-01</td><td>Boss</td><td><span class="badge badge-red">Kingpin</span></td><td>728</td><td>0</td><td style="font-family:var(--mono);color:var(--red)">1.0000</td></tr>
+          <tr><td style="font-family:var(--mono)">D-01</td><td>Rahman</td><td><span class="badge badge-blue">Distributor</span></td><td>510</td><td>487</td><td style="font-family:var(--mono);color:var(--amber)">0.5833</td></tr>
+          <tr><td style="font-family:var(--mono)">D-02</td><td>Anwar</td><td><span class="badge badge-blue">Distributor</span></td><td>275</td><td>241</td><td style="font-family:var(--mono);color:var(--amber)">0.4167</td></tr>
+          <tr><td style="font-family:var(--mono)">DL-01</td><td>Kumar</td><td><span class="badge badge-amber">Dealer</span></td><td>181</td><td>312</td><td style="font-family:var(--mono)">0.1667</td></tr>
+          <tr><td style="font-family:var(--mono)">DL-02</td><td>Ravi</td><td><span class="badge badge-amber">Dealer</span></td><td>62</td><td>198</td><td style="font-family:var(--mono)">0.0833</td></tr>
+          <tr><td style="font-family:var(--mono)">DL-03</td><td>Syed</td><td><span class="badge badge-amber">Dealer</span></td><td>54</td><td>156</td><td style="font-family:var(--mono)">0.0833</td></tr>
+          <tr><td style="font-family:var(--mono)">B-01</td><td>Buyer1</td><td><span class="badge badge-green">Buyer</span></td><td>0</td><td>94</td><td style="font-family:var(--mono)">0.0000</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- NETWORK -->
+    <div class="page" id="page-network">
+      <div class="page-title">// criminal network graph</div>
+      <div class="page-subtitle">Communication Link Analysis</div>
+      <div class="graph-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#ff4444"></div>Kingpin</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4da6ff"></div>Distributor</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f0a500"></div>Dealer</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#00d68f"></div>Buyer</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>Unknown</div>
+        <div style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--text3)">drag nodes • scroll to zoom • hover for details</div>
+      </div>
+      <div id="graph-container">
+        <div class="node-tooltip" id="tooltip"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-head">Top Communication Links</div>
+        <table>
+          <tr><th>From</th><th>To</th><th>Messages</th><th>Channel</th><th>Risk</th></tr>
+          <tr><td>K-01 (Boss)</td><td>D-01 (Rahman)</td><td>487</td><td>Messenger</td><td><span class="badge badge-red">Critical</span></td></tr>
+          <tr><td>D-01 (Rahman)</td><td>DL-01 (Kumar)</td><td>312</td><td>WhatsApp</td><td><span class="badge badge-red">High</span></td></tr>
+          <tr><td>K-01 (Boss)</td><td>D-02 (Anwar)</td><td>241</td><td>Telegram</td><td><span class="badge badge-red">High</span></td></tr>
+          <tr><td>D-02 (Anwar)</td><td>DL-02 (Ravi)</td><td>198</td><td>SMS</td><td><span class="badge badge-amber">Medium</span></td></tr>
+          <tr><td>DL-01 (Kumar)</td><td>B-01 (Buyer1)</td><td>94</td><td>Signal</td><td><span class="badge badge-amber">Medium</span></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- MESSAGES -->
+    <div class="page" id="page-messages">
+      <div class="page-title">// messenger_forensics.py output</div>
+      <div class="page-subtitle">Extracted Messages</div>
+      <div class="hash-box">
+        <div class="hash-label">SHA-256 INTEGRITY HASH (demo_messenger.db)</div>
+        a3f82c1d9e4b7065f2a18c3d5e6f9012b4c7d8e1f3a05b2c6d9e4f17a82b3c5d
+      </div>
+      <div class="msg-filters">
+        <button class="filter-btn on" onclick="filterMsgs('all',this)">ALL</button>
+        <button class="filter-btn" onclick="filterMsgs('flagged',this)">⚠ FLAGGED</button>
+        <button class="filter-btn" onclick="filterMsgs('deleted',this)">⊘ DELETED</button>
+        <button class="filter-btn" onclick="filterMsgs('T-001',this)">THREAD T-001</button>
+        <button class="filter-btn" onclick="filterMsgs('T-002',this)">THREAD T-002</button>
+        <button class="filter-btn" onclick="filterMsgs('T-003',this)">THREAD T-003</button>
+        <button class="filter-btn" onclick="filterMsgs('T-004',this)">THREAD T-004</button>
+      </div>
+      <input class="search-bar" placeholder="search messages..." oninput="searchMsgs(this.value)" id="msg-search"/>
+      <div id="msg-list"></div>
+    </div>
+
+    <!-- CALLS -->
+    <div class="page" id="page-calls">
+      <div class="page-title">// call log extraction</div>
+      <div class="page-subtitle">Call Records</div>
+      <div class="card">
+        <div class="card-head">extracted_calls.csv — 5 records</div>
+        <div id="call-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">Call Duration Analysis</div>
+        <div style="position:relative;height:220px"><canvas id="callChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- NIST -->
+    <div class="page" id="page-nist">
+      <div class="page-title">// compliance framework</div>
+      <div class="page-subtitle">NIST SP 800-101 R1 Application</div>
+      <div class="card">
+        <div class="card-head">Five-Phase Forensic Process</div>
+        <div id="nist-phases"></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head">Acquisition Methods</div>
+          <table>
+            <tr><th>Method</th><th>Data Access</th><th>Requirement</th></tr>
+            <tr><td>Logical</td><td>App data, contacts</td><td><span class="badge badge-green">Any device</span></td></tr>
+            <tr><td>File System</td><td>Full FS tree</td><td><span class="badge badge-amber">Rooted</span></td></tr>
+            <tr><td>Physical</td><td>Raw flash dump</td><td><span class="badge badge-red">Specialist tool</span></td></tr>
+            <tr><td>JTAG/ISP</td><td>Chip-level access</td><td><span class="badge badge-red">Hardware lab</span></td></tr>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-head">Chain of Custody Checklist</div>
+          <div style="font-size:13px;font-family:var(--mono)">
+            <div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;"><span style="color:var(--green)">✓</span><span style="color:var(--text2)">Device isolation in Faraday bag</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;"><span style="color:var(--green)">✓</span><span style="color:var(--text2)">MD5 / SHA-256 hash before acquisition</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;"><span style="color:var(--green)">✓</span><span style="color:var(--text2)">Write-blocker applied</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;"><span style="color:var(--green)">✓</span><span style="color:var(--text2)">Acquisition log timestamped</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;"><span style="color:var(--green)">✓</span><span style="color:var(--text2)">Examiner signature documented</span></div>
+            <div style="padding:8px 0;display:flex;gap:8px;align-items:center;"><span style="color:var(--amber)">○</span><span style="color:var(--text2)">Court submission pending</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="page" id="page-timeline">
+      <div class="page-title">// investigation log</div>
+      <div class="page-subtitle">Case Timeline</div>
+      <div class="card"><div id="tl-items"></div></div>
+    </div>
+
+    <!-- REPORT -->
+    <div class="page" id="page-report">
+      <div class="page-title">// forensic_report.txt</div>
+      <div class="page-subtitle">Generated Forensic Report</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-green" onclick="downloadReport()">↓ Download Report</button>
+        <button class="btn btn-red" onclick="copyReport()">⎘ Copy to Clipboard</button>
+      </div>
+      <div class="report-box" id="report-box"></div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ─────────────────────────────────────────────
+// DATA (matches Python script output exactly)
+// ─────────────────────────────────────────────
+const MESSAGES = [
+  {id:"MSG-0001",thread:"T-001",sender:"Boss (K-01)",    datetime:"2024-01-01 00:00:00",text:"The package is ready. Set the drop location.",         flagged:true,  deleted:false},
+  {id:"MSG-0002",thread:"T-001",sender:"Rahman (D-01)",  datetime:"2024-01-01 01:00:00",text:"Okay. Meet at the usual spot near the warehouse.",      flagged:true,  deleted:false},
+  {id:"MSG-0003",thread:"T-001",sender:"Boss (K-01)",    datetime:"2024-01-01 02:00:00",text:"Price is fixed. Don't negotiate.",                      flagged:true,  deleted:false},
+  {id:"MSG-0004",thread:"T-001",sender:"Rahman (D-01)",  datetime:"2024-01-01 03:00:00",text:"Understood. Will pick up at midnight.",                  flagged:true,  deleted:false},
+  {id:"MSG-0005",thread:"T-001",sender:"Boss (K-01)",    datetime:"2024-01-01 04:00:00",text:"Transfer the payment before you collect.",               flagged:true,  deleted:false},
+  {id:"MSG-0006",thread:"T-001",sender:"Rahman (D-01)",  datetime:"2024-01-01 05:00:00",text:"Done. Sending now.",                                     flagged:false, deleted:false},
+  {id:"MSG-0007",thread:"T-001",sender:"Boss (K-01)",    datetime:"2024-01-01 06:00:00",text:"Good. Confirm once you have the stuff.",                 flagged:true,  deleted:false},
+  {id:"MSG-0008",thread:"T-001",sender:"Rahman (D-01)",  datetime:"2024-01-01 07:00:00",text:"Confirmed. Delivery successful.",                        flagged:false, deleted:false},
+  {id:"MSG-0009",thread:"T-002",sender:"Boss (K-01)",    datetime:"2024-01-01 08:00:00",text:"New supply arriving Friday. Alert your dealers.",        flagged:false, deleted:false},
+  {id:"MSG-0010",thread:"T-002",sender:"Anwar (D-02)",   datetime:"2024-01-01 09:00:00",text:"Got it. How many units?",                                flagged:false, deleted:false},
+  {id:"MSG-0011",thread:"T-002",sender:"Boss (K-01)",    datetime:"2024-01-01 10:00:00",text:"200 units. Same price as last time.",                    flagged:true,  deleted:false},
+  {id:"MSG-0012",thread:"T-002",sender:"Anwar (D-02)",   datetime:"2024-01-01 11:00:00",text:"I'll arrange the drop points.",                         flagged:true,  deleted:false},
+  {id:"MSG-0013",thread:"T-003",sender:"Rahman (D-01)",  datetime:"2024-01-01 12:00:00",text:"Kumar, meet me at the bridge at 10pm.",                  flagged:true,  deleted:false},
+  {id:"MSG-0014",thread:"T-003",sender:"Kumar (DL-01)",  datetime:"2024-01-01 13:00:00",text:"Sure. I'll bring the cash.",                             flagged:false, deleted:false},
+  {id:"MSG-0015",thread:"T-003",sender:"Rahman (D-01)",  datetime:"2024-01-01 14:00:00",text:"Don't be late. The buyer is waiting.",                   flagged:true,  deleted:false},
+  {id:"MSG-0016",thread:"T-003",sender:"Kumar (DL-01)",  datetime:"2024-01-01 15:00:00",text:"On my way. 15 minutes.",                                 flagged:false, deleted:false},
+  {id:"MSG-0017",thread:"T-004",sender:"Kumar (DL-01)",  datetime:"2024-01-01 16:00:00",text:"Package ready. Location: old market.",                   flagged:true,  deleted:false},
+  {id:"MSG-0018",thread:"T-004",sender:"Buyer1 (B-01)",  datetime:"2024-01-01 17:00:00",text:"Okay. What price?",                                      flagged:true,  deleted:false},
+  {id:"MSG-0019",thread:"T-004",sender:"Kumar (DL-01)",  datetime:"2024-01-01 18:00:00",text:"Same as last buy. Come alone.",                          flagged:false, deleted:false},
+  {id:"MSG-0020",thread:"T-004",sender:"Buyer1 (B-01)",  datetime:"2024-01-01 19:00:00",text:"Understood. See you there.",                             flagged:false, deleted:false},
+  {id:"MSG-0021",thread:"T-001",sender:"Boss (K-01)",    datetime:"2024-01-01 20:00:00",text:"[DELETED — RECOVERED] Shipment coordinates attached.",  flagged:true,  deleted:true},
+  {id:"MSG-0022",thread:"T-002",sender:"Anwar (D-02)",   datetime:"2024-01-01 21:00:00",text:"[DELETED — RECOVERED] Route map sent via separate app.",flagged:false, deleted:true},
+];
+
+const CALLS = [
+  {id:"CALL-001",caller:"Boss (K-01)",   callee:"Rahman (D-01)", duration:312, datetime:"2024-01-02 03:33:20", type:"audio"},
+  {id:"CALL-002",caller:"Rahman (D-01)",callee:"Kumar (DL-01)",  duration:187, datetime:"2024-01-02 06:20:00", type:"audio"},
+  {id:"CALL-003",caller:"Boss (K-01)",   callee:"Anwar (D-02)",  duration:425, datetime:"2024-01-02 09:06:40", type:"video"},
+  {id:"CALL-004",caller:"Kumar (DL-01)",callee:"Buyer1 (B-01)",  duration:94,  datetime:"2024-01-02 11:53:20", type:"audio"},
+  {id:"CALL-005",caller:"Anwar (D-02)", callee:"Kumar (DL-01)",  duration:210, datetime:"2024-01-02 14:40:00", type:"audio"},
+];
+
+const KEYWORDS = ["meet","pick","drop","package","price","buy","sell","stuff","location","transfer"];
+
+// ─────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelector(`[data-page="${id}"]`).classList.add('active');
+  if (id === 'network') setTimeout(initGraph, 80);
+  if (id === 'calls')   setTimeout(renderCallChart, 80);
+  if (id === 'report')  renderReport();
+}
+
+// ─────────────────────────────────────────────
+// MESSAGES
+// ─────────────────────────────────────────────
+function highlightKeywords(text) {
+  let t = text;
+  KEYWORDS.forEach(kw => {
+    const re = new RegExp(`(${kw})`, 'gi');
+    t = t.replace(re, '<span class="highlight">$1</span>');
+  });
+  return t;
+}
+
+function renderMessages(filter='all', search='') {
+  let msgs = [...MESSAGES];
+  if (filter === 'flagged') msgs = msgs.filter(m => m.flagged);
+  else if (filter === 'deleted') msgs = msgs.filter(m => m.deleted);
+  else if (filter.startsWith('T-')) msgs = msgs.filter(m => m.thread === filter);
+  if (search) msgs = msgs.filter(m => m.text.toLowerCase().includes(search.toLowerCase()) || m.sender.toLowerCase().includes(search.toLowerCase()));
+
+  const el = document.getElementById('msg-list');
+  if (!msgs.length) { el.innerHTML = '<div class="empty">no messages match filter</div>'; return; }
+  el.innerHTML = msgs.map(m => `
+    <div class="msg-item ${m.flagged?'flagged':''} ${m.deleted?'deleted':''}">
+      <div class="msg-meta">
+        <span class="msg-sender">${m.sender}</span>
+        <span class="msg-time">${m.datetime}</span>
+        <span class="msg-thread">${m.thread}</span>
+        ${m.flagged ? '<span class="badge badge-red">⚠ FLAGGED</span>' : ''}
+        ${m.deleted ? '<span class="badge badge-purple">⊘ DELETED</span>' : ''}
+      </div>
+      <div class="msg-text">${highlightKeywords(m.text)}</div>
+    </div>`).join('');
+}
+renderMessages();
+
+let currentFilter = 'all';
+function filterMsgs(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderMessages(f, document.getElementById('msg-search')?.value || '');
+}
+function searchMsgs(v) { renderMessages(currentFilter, v); }
+
+// ─────────────────────────────────────────────
+// CALLS
+// ─────────────────────────────────────────────
+document.getElementById('call-list').innerHTML = CALLS.map(c => `
+  <div class="call-item">
+    <div class="call-icon ${c.type}">${c.type==='video'?'📹':'📞'}</div>
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:600">${c.caller} → ${c.callee}</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">${c.datetime}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-family:var(--mono);font-size:13px;color:var(--green)">${c.duration}s</div>
+      <span class="badge ${c.type==='video'?'badge-blue':'badge-green'}">${c.type}</span>
+    </div>
+  </div>`).join('');
+
+function renderCallChart() {
+  const canvas = document.getElementById('callChart');
+  if (!canvas || canvas._chart) return;
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: CALLS.map(c => c.caller.split(' ')[0] + ' → ' + c.callee.split(' ')[0]),
+      datasets: [{
+        label: 'Duration (seconds)',
+        data: CALLS.map(c => c.duration),
+        backgroundColor: ['#ff444488','#4da6ff88','#4da6ff88','#00d68f88','#f0a50088'],
+        borderColor:     ['#ff4444',  '#4da6ff',  '#4da6ff',  '#00d68f',  '#f0a500'],
+        borderWidth: 1, borderRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: '#1e2d3d' } },
+        y: { ticks: { color: '#8b949e', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: '#1e2d3d' } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// NIST PHASES
+// ─────────────────────────────────────────────
+const phases = [
+  { n:1, col:'#4da6ff', bg:'rgba(77,166,255,.12)', title:'Preservation', desc:'Device isolated in Faraday bag immediately upon seizure. Airplane mode enforced. Device photographed. Chain of custody form initiated with timestamp, location, and examiner signature.' },
+  { n:2, col:'#a78bfa', bg:'rgba(167,139,250,.12)', title:'Acquisition', desc:'Logical + file-system extraction performed using Cellebrite UFED. SHA-256 hashes computed before and after extraction to verify integrity. Write-blocker applied throughout the process.' },
+  { n:3, col:'#f0a500', bg:'rgba(240,165,0,.12)', title:'Examination', desc:'SQLite database (threads_db2.db) parsed using DB Browser and Autopsy. EXIF metadata extracted from media files. Call log analyzed. Deleted message carving performed via is_deleted flag.' },
+  { n:4, col:'#00d68f', bg:'rgba(0,214,143,.12)', title:'Analysis', desc:'Keyword flagging performed on 2,341 messages — 487 matches. GPS coordinates clustered into 4 hotspots. Criminal network constructed using NetworkX with betweenness centrality. Crypto traced via Chainalysis.' },
+  { n:5, col:'#ff4444', bg:'rgba(255,68,68,.12)', title:'Reporting', desc:'Expert witness report compiled per ISO/IEC 27037 standards. All extracted files hash-verified. NIST SP 800-101 R1 compliance documented. Final report submitted to court as Case DF-2024-0847.' },
+];
+document.getElementById('nist-phases').innerHTML = phases.map(p => `
+  <div class="phase">
+    <div class="phase-num" style="background:${p.bg};color:${p.col}">${p.n}</div>
+    <div class="phase-content">
+      <div class="phase-title" style="color:${p.col}">${p.title}</div>
+      <div class="phase-desc">${p.desc}</div>
+    </div>
+  </div>`).join('');
+
+// ─────────────────────────────────────────────
+// TIMELINE
+// ─────────────────────────────────────────────
+const TL = [
+  { date:'Jan 12', col:'#ff4444', title:'Tip received', sub:'Initial intelligence report filed — drug distribution suspected' },
+  { date:'Jan 15', col:'#4da6ff', title:'Search warrant obtained', sub:'3 devices placed in Faraday bags immediately' },
+  { date:'Jan 17', col:'#4da6ff', title:'Physical acquisition', sub:'Cellebrite UFED used — SHA-256 hashes verified' },
+  { date:'Jan 19', col:'#f0a500', title:'SQLite DB parsed', sub:'2,341 messages extracted — 487 keyword matches' },
+  { date:'Jan 22', col:'#f0a500', title:'Criminal network mapped', sub:'23 nodes, 6 clusters — K-01 identified as kingpin' },
+  { date:'Jan 25', col:'#00d68f', title:'Chemical analysis complete', sub:'GC-MS confirms meth + MDMA in physical samples' },
+  { date:'Feb 02', col:'#00d68f', title:'Crypto wallet traced', sub:'45 transactions — ₹24L linked to suspect K-01' },
+  { date:'Feb 10', col:'#a78bfa', title:'Expert witness report drafted', sub:'NIST SP 800-101 R1 compliance verified' },
+  { date:'Feb 18', col:'#ff4444', title:'Evidence submitted to court', sub:'Case DF-2024-0847 — prosecution phase initiated' },
+];
+document.getElementById('tl-items').innerHTML = TL.map((t, i) => `
+  <div class="tl-item">
+    <div class="tl-left">
+      <div class="tl-dot" style="background:${t.col}"></div>
+      ${i < TL.length-1 ? '<div class="tl-line"></div>' : ''}
+    </div>
+    <div style="margin-right:12px;font-family:var(--mono);font-size:10px;color:var(--text3);min-width:48px;padding-top:1px">${t.date}</div>
+    <div class="tl-body">
+      <div class="tl-title" style="color:${t.col}">${t.title}</div>
+      <div class="tl-sub">${t.sub}</div>
+    </div>
+  </div>`).join('');
+
+// ─────────────────────────────────────────────
+// REPORT GENERATOR
+// ─────────────────────────────────────────────
+function renderReport() {
+  const flagged  = MESSAGES.filter(m => m.flagged && !m.deleted);
+  const deleted  = MESSAGES.filter(m => m.deleted);
+  const now      = new Date().toISOString().replace('T',' ').slice(0,19);
+  let lines = [];
+  lines.push(`<span class="r-head">================================================================</span>`);
+  lines.push(`<span class="r-head">   DIGITAL FORENSIC REPORT — CASE DF-2024-0847</span>`);
+  lines.push(`<span class="r-head">   NIST SP 800-101 R1 Compliant Examination</span>`);
+  lines.push(`<span class="r-head">================================================================</span>`);
+  lines.push(`<span class="r-label">Report generated :</span> <span class="r-value">${now}</span>`);
+  lines.push(`<span class="r-label">Examiner         :</span> <span class="r-value">Digital Forensics Unit</span>`);
+  lines.push(`<span class="r-label">Database file    :</span> <span class="r-value">demo_messenger.db</span>`);
+  lines.push(`<span class="r-label">SHA-256 hash     :</span> <span class="r-value">a3f82c1d9e4b7065f2a18c3d5e6f9012b4c7d8e1f3a05b2c6d9e4f17a82b3c5d</span>`);
+  lines.push(``);
+  lines.push(`<span class="r-div">── EVIDENCE SUMMARY ──────────────────────────────────────────</span>`);
+  lines.push(`<span class="r-label">Total messages extracted :</span> <span class="r-value">${MESSAGES.length}</span>`);
+  lines.push(`<span class="r-label">Flagged (keyword match)  :</span> <span class="r-flag">${flagged.length}</span>`);
+  lines.push(`<span class="r-label">Deleted messages carved  :</span> <span class="r-del">${deleted.length}</span>`);
+  lines.push(`<span class="r-label">Call records found       :</span> <span class="r-value">${CALLS.length}</span>`);
+  lines.push(``);
+  lines.push(`<span class="r-div">── FLAGGED MESSAGES ──────────────────────────────────────────</span>`);
+  flagged.forEach(m => {
+    lines.push(`  <span class="r-flag">[${m.datetime}]  ${m.sender}</span>`);
+    lines.push(`  <span class="r-label">Thread :</span> <span class="r-value">${m.thread}</span>`);
+    lines.push(`  <span class="r-label">Text   :</span> <span class="r-value">${m.text}</span>`);
+    lines.push(``);
+  });
+  lines.push(`<span class="r-div">── DELETED MESSAGES (RECOVERED) ──────────────────────────────</span>`);
+  deleted.forEach(m => {
+    lines.push(`  <span class="r-del">[${m.datetime}]  ${m.sender}</span>`);
+    lines.push(`  <span class="r-label">Text   :</span> <span class="r-value">${m.text}</span>`);
+    lines.push(``);
+  });
+  lines.push(`<span class="r-div">── CALL LOG SUMMARY ──────────────────────────────────────────</span>`);
+  CALLS.forEach(c => {
+    lines.push(`  <span class="r-value">[${c.datetime}]  ${c.caller} → ${c.callee}  |  ${c.duration}s  |  ${c.type}</span>`);
+  });
+  lines.push(``);
+  lines.push(`<span class="r-head">================================================================</span>`);
+  lines.push(`<span class="r-head">END OF REPORT</span>`);
+  lines.push(`<span class="r-head">================================================================</span>`);
+  document.getElementById('report-box').innerHTML = lines.join('\n');
+}
+
+function getReportText() {
+  return document.getElementById('report-box').innerText;
+}
+function downloadReport() {
+  const blob = new Blob([getReportText()], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'forensic_report_DF-2024-0847.txt';
+  a.click();
+}
+function copyReport() {
+  navigator.clipboard.writeText(getReportText()).then(() => {
+    const btn = event.target;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = '⎘ Copy to Clipboard', 2000);
+  });
+}
+
+// ─────────────────────────────────────────────
+// D3 NETWORK GRAPH
+// ─────────────────────────────────────────────
+function initGraph() {
+  const container = document.getElementById('graph-container');
+  if (container.querySelector('svg')) return;
+  const W = container.clientWidth, H = container.clientHeight;
+
+  const nodes = [
+    { id:'K-01',  label:'K-01\nBoss',    role:'kingpin',     color:'#ff4444', r:30 },
+    { id:'D-01',  label:'D-01\nRahman',  role:'distributor', color:'#4da6ff', r:22 },
+    { id:'D-02',  label:'D-02\nAnwar',   role:'distributor', color:'#4da6ff', r:22 },
+    { id:'DL-01', label:'DL-01\nKumar',  role:'dealer',      color:'#f0a500', r:17 },
+    { id:'DL-02', label:'DL-02\nRavi',   role:'dealer',      color:'#f0a500', r:17 },
+    { id:'DL-03', label:'DL-03\nSyed',   role:'dealer',      color:'#f0a500', r:17 },
+    { id:'B-01',  label:'B-01',          role:'buyer',       color:'#00d68f', r:12 },
+    { id:'B-02',  label:'B-02',          role:'buyer',       color:'#00d68f', r:12 },
+    { id:'B-03',  label:'B-03',          role:'buyer',       color:'#00d68f', r:12 },
+    { id:'B-04',  label:'B-04',          role:'buyer',       color:'#00d68f', r:12 },
+    { id:'U-01',  label:'U-01\n?',       role:'unknown',     color:'#a78bfa', r:14 },
+  ];
+
+  const links = [
+    {source:'K-01', target:'D-01',  weight:487},
+    {source:'K-01', target:'D-02',  weight:241},
+    {source:'D-01', target:'DL-01', weight:312},
+    {source:'D-01', target:'DL-02', weight:198},
+    {source:'D-02', target:'DL-03', weight:156},
+    {source:'D-02', target:'U-01',  weight:34},
+    {source:'DL-01',target:'B-01',  weight:94},
+    {source:'DL-01',target:'B-02',  weight:87},
+    {source:'DL-02',target:'B-03',  weight:62},
+    {source:'DL-03',target:'B-04',  weight:54},
+  ];
+
+  const svg = d3.select('#graph-container').append('svg')
+    .attr('width', W).attr('height', H);
+
+  const defs = svg.append('defs');
+  nodes.forEach(n => {
+    defs.append('marker')
+      .attr('id', 'arr-' + n.id)
+      .attr('viewBox','0 -4 8 8')
+      .attr('refX', 8).attr('refY', 0)
+      .attr('markerWidth', 5).attr('markerHeight', 5)
+      .attr('orient','auto')
+      .append('path').attr('d','M0,-4L8,0L0,4').attr('fill', n.color).attr('opacity',.6);
+  });
+
+  const g = svg.append('g');
+  svg.call(d3.zoom().scaleExtent([.3,3]).on('zoom', e => g.attr('transform', e.transform)));
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(d => 130 - d.weight/20).strength(.7))
+    .force('charge', d3.forceManyBody().strength(-400))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide(d => d.r + 18));
+
+  const link = g.append('g').selectAll('line').data(links).enter().append('line')
+    .attr('class','link')
+    .attr('stroke', d => {
+      const src = nodes.find(n=>n.id===d.source.id||n.id===d.source);
+      return src ? src.color : '#888';
+    })
+    .attr('stroke-width', d => Math.max(1, d.weight/120))
+    .attr('marker-end', d => {
+      const tgt = nodes.find(n=>n.id===d.target.id||n.id===d.target);
+      return `url(#arr-${tgt?tgt.id:'K-01'})`;
+    });
+
+  const tooltip = document.getElementById('tooltip');
+
+  const node = g.append('g').selectAll('g').data(nodes).enter().append('g')
+    .attr('class','node')
+    .call(d3.drag()
+      .on('start', (e,d) => { if(!e.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on('drag',  (e,d) => { d.fx=e.x; d.fy=e.y; })
+      .on('end',   (e,d) => { if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; })
+    )
+    .on('mouseover', (e, d) => {
+      tooltip.style.opacity = 1;
+      tooltip.innerHTML = `<div class="tt-name">${d.id}</div>
+        <div class="tt-row">Name: <span>${d.label.split('\n')[1]||'—'}</span></div>
+        <div class="tt-row">Role: <span>${d.role}</span></div>`;
+      tooltip.style.left = (e.offsetX + 14) + 'px';
+      tooltip.style.top  = (e.offsetY - 14) + 'px';
+    })
+    .on('mouseout', () => { tooltip.style.opacity = 0; });
+
+  node.append('circle')
+    .attr('r', d => d.r)
+    .attr('fill', d => d.color + '22')
+    .attr('stroke', d => d.color);
+
+  node.append('text')
+    .attr('class','node-label')
+    .attr('text-anchor','middle')
+    .attr('dy','0.35em')
+    .attr('fill', d => d.color)
+    .each(function(d) {
+      const el = d3.select(this);
+      const parts = d.label.split('\n');
+      if (parts.length > 1) {
+        el.append('tspan').attr('x',0).attr('dy','-0.6em').text(parts[0]);
+        el.append('tspan').attr('x',0).attr('dy','1.2em').text(parts[1]);
+      } else {
+        el.text(parts[0]);
+      }
+    });
+
+  sim.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => {
+        const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
+        const dist = Math.sqrt(dx*dx+dy*dy)||1;
+        return d.target.x - (dx/dist)*(d.target.r+6);
+      })
+      .attr('y2', d => {
+        const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
+        const dist = Math.sqrt(dx*dx+dy*dy)||1;
+        return d.target.y - (dy/dist)*(d.target.r+6);
+      });
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+}
+</script>
+</body>
+</html>

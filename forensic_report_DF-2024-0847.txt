@@ -1,0 +1,81 @@
+================================================================
+   DIGITAL FORENSIC REPORT — CASE DF-2024-0847
+   NIST SP 800-101 R1 Compliant Examination
+================================================================
+Report generated : 2026-03-16 19:13:00
+Examiner         : Digital Forensics Unit
+Database file    : demo_messenger.db
+SHA-256 hash     : a3f82c1d9e4b7065f2a18c3d5e6f9012b4c7d8e1f3a05b2c6d9e4f17a82b3c5d
+
+── EVIDENCE SUMMARY ──────────────────────────────────────────
+Total messages extracted : 22
+Flagged (keyword match)  : 12
+Deleted messages carved  : 2
+Call records found       : 5
+
+── FLAGGED MESSAGES ──────────────────────────────────────────
+  [2024-01-01 00:00:00]  Boss (K-01)
+  Thread : T-001
+  Text   : The package is ready. Set the drop location.
+
+  [2024-01-01 01:00:00]  Rahman (D-01)
+  Thread : T-001
+  Text   : Okay. Meet at the usual spot near the warehouse.
+
+  [2024-01-01 02:00:00]  Boss (K-01)
+  Thread : T-001
+  Text   : Price is fixed. Don't negotiate.
+
+  [2024-01-01 03:00:00]  Rahman (D-01)
+  Thread : T-001
+  Text   : Understood. Will pick up at midnight.
+
+  [2024-01-01 04:00:00]  Boss (K-01)
+  Thread : T-001
+  Text   : Transfer the payment before you collect.
+
+  [2024-01-01 06:00:00]  Boss (K-01)
+  Thread : T-001
+  Text   : Good. Confirm once you have the stuff.
+
+  [2024-01-01 10:00:00]  Boss (K-01)
+  Thread : T-002
+  Text   : 200 units. Same price as last time.
+
+  [2024-01-01 11:00:00]  Anwar (D-02)
+  Thread : T-002
+  Text   : I'll arrange the drop points.
+
+  [2024-01-01 12:00:00]  Rahman (D-01)
+  Thread : T-003
+  Text   : Kumar, meet me at the bridge at 10pm.
+
+  [2024-01-01 14:00:00]  Rahman (D-01)
+  Thread : T-003
+  Text   : Don't be late. The buyer is waiting.
+
+  [2024-01-01 16:00:00]  Kumar (DL-01)
+  Thread : T-004
+  Text   : Package ready. Location: old market.
+
+  [2024-01-01 17:00:00]  Buyer1 (B-01)
+  Thread : T-004
+  Text   : Okay. What price?
+
+── DELETED MESSAGES (RECOVERED) ──────────────────────────────
+  [2024-01-01 20:00:00]  Boss (K-01)
+  Text   : [DELETED — RECOVERED] Shipment coordinates attached.
+
+  [2024-01-01 21:00:00]  Anwar (D-02)
+  Text   : [DELETED — RECOVERED] Route map sent via separate app.
+
+── CALL LOG SUMMARY ──────────────────────────────────────────
+  [2024-01-02 03:33:20]  Boss (K-01) → Rahman (D-01)  |  312s  |  audio
+  [2024-01-02 06:20:00]  Rahman (D-01) → Kumar (DL-01)  |  187s  |  audio
+  [2024-01-02 09:06:40]  Boss (K-01) → Anwar (D-02)  |  425s  |  video
+  [2024-01-02 11:53:20]  Kumar (DL-01) → Buyer1 (B-01)  |  94s  |  audio
+  [2024-01-02 14:40:00]  Anwar (D-02) → Kumar (DL-01)  |  210s  |  audio
+
+================================================================
+END OF REPORT
+================================================================

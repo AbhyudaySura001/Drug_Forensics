@@ -1,0 +1,12 @@
+ID,Name,Role,Sent,Received,Centrality
+D-01,Rahman,distributor,510,487,0.0556
+DL-01,Kumar,dealer,181,312,0.0444
+D-02,Anwar,distributor,190,241,0.0333
+DL-03,Syed,dealer,54,156,0.0222
+DL-02,Ravi,dealer,62,198,0.0222
+K-01,Boss,kingpin,728,0,0.0
+B-01,Buyer1,buyer,0,94,0.0
+B-02,Buyer2,buyer,0,87,0.0
+B-03,Buyer3,buyer,0,62,0.0
+B-04,Buyer4,buyer,0,54,0.0
+U-01,Unknown,unknown,0,34,0.0
